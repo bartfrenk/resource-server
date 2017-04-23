@@ -26,7 +26,6 @@ init(StorePid) ->
 
 %% @private
 running(StorePid, Resources) ->
-  utils:call(StorePid, {put, Resources}), %% store updated resources
 
   receive
 
@@ -35,11 +34,13 @@ running(StorePid, Resources) ->
 
     {request, Tag, Pid, allocate} ->
       {NewResources, Reply} = allocate(Resources, Pid),
+      utils:call(StorePid, {put, NewResources}),
       Pid ! {reply, Tag, Reply},
       running(StorePid, NewResources);
 
     {request, Tag, Pid, deallocate} ->
       {NewResources, Reply} = deallocate(Resources, Pid),
+      utils:call(StorePid, {put, NewResources}),
       Pid ! {reply, Tag, Reply},
       running(StorePid, NewResources);
 
@@ -49,10 +50,12 @@ running(StorePid, Resources) ->
 
     {request, Tag, Pid, {set_store, NewStorePid}} ->
       Pid ! {reply, Tag, ok},
+      utils:call(NewStorePid, {put, Resources}),
       running(NewStorePid, Resources);
 
     {'EXIT', Pid, _Reason} ->
       {NewResources, _Reply} = deallocate(Resources, Pid),
+      utils:call(StorePid, {put, NewResources}),
       running(StorePid, NewResources)
 
   end.
