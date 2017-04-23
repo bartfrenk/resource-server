@@ -14,7 +14,6 @@ start(Resources) ->
 init() -> init(resources()).
 init(Resources) ->
   register(?NAME, self()), %% easier to refer to overseer
-  process_flag(trap_exit, true),
   running({Resources, #{}}).
 
 running(Resources) ->
@@ -28,7 +27,7 @@ running(Resources) ->
       running(NewResources);
 
     {request, Tag, Pid, get} ->
-      Pid ! {reply, Tag, Resources},
+      Pid ! {reply, Tag, {ok, Resources}},
       running(Resources)
   end.
 

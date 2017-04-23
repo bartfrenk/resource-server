@@ -1,6 +1,7 @@
 -module(simulation).
 -export([retry_and_stop/0, retry_and_spin/0, toggle/0]).
--export([scenario_stop_client/1, scenario_stop_server/1]).
+-export([scenario_single_client/1,
+         scenario_multiple_clients/2]).
 
 
 %% === Specific behaviours ===
@@ -9,7 +10,7 @@
 %% succeeds and stops.
 retry_and_stop() -> {fun(initial) ->
                          case server:allocate() of
-                           {error, no_server} -> initial;
+                           {error, no_process} -> initial;
                            {error, no_resource} -> initial;
                            {_, _} -> final
                          end;
@@ -20,7 +21,7 @@ retry_and_stop() -> {fun(initial) ->
 
 retry_and_spin() -> {fun(initial) ->
                          case server:allocate() of
-                           {error, no_server} -> initial;
+                           {error, no_process} -> initial;
                            {error, no_resource} -> initial;
                            {_, _} -> final
                          end;
@@ -31,70 +32,82 @@ retry_and_spin() -> {fun(initial) ->
 
 toggle() -> {fun(empty) ->
                  case server:allocate() of
-                   {error, no_server} -> empty;
+                   {error, no_proces} -> empty;
                    {error, no_resource} -> empty;
                    {_, _} -> full
                  end;
                 (full) ->
                  case server:deallocate() of
-                   {error, no_server} -> full;
+                   {error, no_process} -> full;
                    _ -> empty
                  end
              end, 0,
              fun(_) -> false end,
              empty}.
 
-scenario_stop_client(Tick) ->
-  case whereis(resources) of
-    undefined -> server:start();
+scenario_single_client(Tick) ->
+  case whereis(overseer) of
+    undefined -> overseer:start();
     _ -> ok
   end,
   timer:sleep(Tick),
-  io:format("resources: ~p~n", [server:inspect()]),
+  log:info(resources, "~p~n", [server:inspect()]),
+  log:info(store, "~p~n", [store:get()]),
   timer:sleep(Tick),
   C = client:start(client:debug("client", Tick, retry_and_spin())),
-  timer:sleep(2 * Tick),
-  io:format("resources: ~p~n", [server:inspect()]),
   timer:sleep(Tick),
+  log:info(resources, "~p~n", [server:inspect()]),
+  log:info(store, "~p~n", [store:get()]),
+  timer:sleep(Tick),
+  server:stop(),
+  timer:sleep(Tick),
+  log:info(resources, "~p~n", [server:inspect()]),
+  log:info(store, "~p~n", [store:get()]),
+  timer:sleep(Tick),
+  store:stop(),
+  timer:sleep(Tick),
+  log:info(resources, "~p~n", [server:inspect()]),
+  log:info(store, "~p~n", [store:get()]),
   client:stop(C),
-  timer:sleep(Tick),
-  io:format("resources: ~p~n", [server:inspect()]),
-  server:stop().
+  overseer:stop(),
+  server:stop(),
+  store:stop(),
+  log:info(resources, "~p~n", [server:inspect()]),
+  log:info(store, "~p~n", [store:get()]).
 
 
-scenario_stop_server(Tick) ->
-  case whereis(resources) of
-    undefined -> server:start();
+client_name(I) -> "C" ++ integer_to_list(I).
+
+scenario_multiple_clients(Tick, N) ->
+  case whereis(overseer) of
+    undefined -> overseer:start();
     _ -> ok
   end,
   timer:sleep(Tick),
-  io:format("resources: ~p~n", [server:inspect()]),
+  log:info(resources, "~p~n", [server:inspect()]),
+  log:info(store, "~p~n", [store:get()]),
   timer:sleep(Tick),
-  C = client:start(client:debug("client", Tick, retry_and_spin())),
+  Delays = utils:randoms(N, Tick div 2, Tick + Tick div 2),
+  Cs = lists:zipwith(
+         fun(I, D) ->
+             client:start(client:debug(client_name(I), D, toggle())) end,
+         lists:seq(1, N), Delays),
   timer:sleep(Tick),
-  io:format("resources: ~p~n", [server:inspect()]),
-  timer:sleep(Tick),
-  server:stop(),
-  timer:sleep(Tick),
-  io:format("resources: ~p~n", [server:inspect()]),
-  timer:sleep(Tick),
-  client:stop(C).
-
-scenario_stop_supervised_server(Tick) ->
-  case whereis(supervisor) of
-    undefined -> server:start();
-    _ -> ok
-  end,
-  timer:sleep(Tick),
-  io:format("resources: ~p~n", [server:inspect()]),
-  timer:sleep(Tick),
-  C = client:start(client:debug("client", Tick, retry_and_spin())),
-  timer:sleep(Tick),
-  io:format("resources: ~p~n", [server:inspect()]),
+  log:info(resources, "~p~n", [server:inspect()]),
+  log:info(store, "~p~n", [store:get()]),
   timer:sleep(Tick),
   server:stop(),
   timer:sleep(Tick),
-  io:format("resources: ~p~n", [server:inspect()]),
+  log:info(resources, "~p~n", [server:inspect()]),
+  log:info(store, "~p~n", [store:get()]),
   timer:sleep(Tick),
-  client:stop(C).
-
+  store:stop(),
+  timer:sleep(Tick),
+  log:info(resources, "~p~n", [server:inspect()]),
+  log:info(store, "~p~n", [store:get()]),
+  lists:foreach(fun(C) -> client:stop(C) end, Cs),
+  overseer:stop(),
+  server:stop(),
+  store:stop(),
+  log:info(resources, "~p~n", [server:inspect()]),
+  log:info(store, "~p~n", [store:get()]).

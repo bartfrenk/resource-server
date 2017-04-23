@@ -1,5 +1,5 @@
 -module(server).
--export([start/0, start/1, init/0, init/1]).
+-export([start/1, init/1]).
 -export([stop/0, stop/1, allocate/0, allocate/1, deallocate/0, deallocate/1,
          inspect/0, inspect/1]).
 
@@ -10,19 +10,24 @@
 %% === Running a server ===
 
 %% @doc Spawns the resource server.
-start() -> start(resources()).
-start(Resources) ->
-  spawn(fun() -> init(Resources) end).
+start(StorePid) ->
+  spawn(fun() -> init(StorePid) end).
 
 %% @doc Starts the resource server.
-init() -> init(resources()).
-init(Resources) ->
-  register(?NAME, self()),
-  process_flag(trap_exit, true),
-  running({Resources, #{}}).
+init(StorePid) ->
+  case utils:call(StorePid, get) of
+    {ok, Resources} ->
+      register(?NAME, self()),
+      process_flag(trap_exit, true),
+      log:info(?NAME, "starting with allocations: ~p~n", [Resources]),
+      running(StorePid, Resources);
+    Msg -> log:warn(?NAME, "could not contact store: ~p~n", [Msg])
+  end.
 
 %% @private
-running(Resources) ->
+running(StorePid, Resources) ->
+  utils:call(StorePid, {put, Resources}), %% store updated resources
+
   receive
 
     {request, Tag, Pid, stop} ->
@@ -31,25 +36,26 @@ running(Resources) ->
     {request, Tag, Pid, allocate} ->
       {NewResources, Reply} = allocate(Resources, Pid),
       Pid ! {reply, Tag, Reply},
-      running(NewResources);
+      running(StorePid, NewResources);
 
     {request, Tag, Pid, deallocate} ->
       {NewResources, Reply} = deallocate(Resources, Pid),
       Pid ! {reply, Tag, Reply},
-      running(NewResources);
+      running(StorePid, NewResources);
 
     {request, Tag, Pid, inspect} ->
       Pid ! {reply, Tag, Resources},
-      running(Resources);
+      running(StorePid, Resources);
+
+    {request, Tag, Pid, {set_store, NewStorePid}} ->
+      Pid ! {reply, Tag, ok},
+      running(NewStorePid, Resources);
 
     {'EXIT', Pid, _Reason} ->
       {NewResources, _Reply} = deallocate(Resources, Pid),
-      running(NewResources)
+      running(StorePid, NewResources)
 
   end.
-
-%% @private
-resources() -> lists:seq(10, 20).
 
 
 %% === Synchronous functions to interact with the server ===
@@ -71,11 +77,7 @@ inspect(Timeout) -> call_server(inspect, Timeout).
 
 %% @private
 call_server(Request, Timeout) ->
-  case whereis(?NAME) of
-    undefined -> {error, no_server};
-    Pid -> utils:call(Pid, Request, Timeout)
-  end.
-
+  utils:call_registered(?NAME, Request, Timeout).
 
 %% === Allocating and deallocating resources ===
 
