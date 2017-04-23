@@ -79,3 +79,22 @@ scenario_stop_server(Tick) ->
   io:format("resources: ~p~n", [server:inspect()]),
   timer:sleep(Tick),
   client:stop(C).
+
+scenario_stop_supervised_server(Tick) ->
+  case whereis(supervisor) of
+    undefined -> server:start();
+    _ -> ok
+  end,
+  timer:sleep(Tick),
+  io:format("resources: ~p~n", [server:inspect()]),
+  timer:sleep(Tick),
+  C = client:start(client:debug("client", Tick, retry_and_spin())),
+  timer:sleep(Tick),
+  io:format("resources: ~p~n", [server:inspect()]),
+  timer:sleep(Tick),
+  server:stop(),
+  timer:sleep(Tick),
+  io:format("resources: ~p~n", [server:inspect()]),
+  timer:sleep(Tick),
+  client:stop(C).
+

@@ -1,5 +1,5 @@
 -module(server).
--export([start/0, start/1]).
+-export([start/0, start/1, init/0, init/1]).
 -export([stop/0, stop/1, allocate/0, allocate/1, deallocate/0, deallocate/1,
          inspect/0, inspect/1]).
 
@@ -9,19 +9,19 @@
 
 %% === Running a server ===
 
-%% @doc Start the resource server.
+%% @doc Spawns the resource server.
 start() -> start(resources()).
 start(Resources) ->
   spawn(fun() -> init(Resources) end).
 
-%% @private
+%% @doc Starts the resource server.
+init() -> init(resources()).
 init(Resources) ->
   register(?NAME, self()),
   process_flag(trap_exit, true),
   running({Resources, #{}}).
 
 %% @private
-% TODO: Handle EXIT messages to deallocate resources for stopped clients
 running(Resources) ->
   receive
 
