@@ -6,11 +6,11 @@ Programming in Erlang* course on FutureLearn.
 I refer to the frequency server in the exercise as the resource server. The
 entire system consists of three processes:
 
-1. A supervisor, called the overseer. It is implemented in `overseer.erl`.
-2. A client-facing server, called the resource server. It is implemented in `server.erl`.
-3. A store, that duplicates the state of the server; this process could be
-   responsible for persisting allocated resources if necessary. It is
-   implemented in `store.erl`.
+* A supervisor, called the overseer. It is implemented in `overseer.erl`.
+* A client-facing server, called the resource server. It is implemented in `server.erl`.
+* A store that duplicates the state of the server and reseeds it when it
+  restarts; this process could be responsible for persisting allocated resources
+  if necessary. It is implemented in `store.erl`.
 
 The basic premise is that clients should only depend on the server being up when
 they are allocating and deallocating resource, otherwise they shouldn't. I
