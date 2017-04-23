@@ -1,4 +1,4 @@
-# Resource server
+# Resource Server
 
 Solution to the *Supervision in the Frequency Server* exercise of the *Concurrent
 Programming in Erlang* course on FutureLearn.
