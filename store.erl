@@ -1,6 +1,7 @@
 -module(store).
 -export([start/0, start/1, init/0, init/1]).
--export([get/1, put/2, stop/1]).
+-export([get/0, put/1, stop/0]).
+-define(NAME, store).
 
 resources() -> lists:seq(10, 20).
 
@@ -12,6 +13,7 @@ start(Resources) ->
 %% @doc Starts the resource store.
 init() -> init(resources()).
 init(Resources) ->
+  register(?NAME, self()), %% easier to refer to overseer
   process_flag(trap_exit, true),
   running({Resources, #{}}).
 
@@ -30,10 +32,10 @@ running(Resources) ->
       running(Resources)
   end.
 
-stop(Store) -> utils:call(Store, stop).
+stop() -> utils:call_registered(?NAME, stop).
 
-put(Store, Resources) -> utils:call(Store, {put, Resources}).
+put(Resources) -> utils:call_registered(?NAME, {put, Resources}).
 
-get(Store) -> utils:call(Store, get).
+get() -> utils:call_registered(?NAME, get).
 
 
