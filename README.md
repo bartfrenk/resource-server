@@ -22,10 +22,11 @@ The four remaining files hold:
 * `log.erl`: A simple logger abstraction.
 * `utils.erl`: Utility functions for generating random numbers, and for doing
   synchronous calls to registered and unregistered processes.
-* `client.erl`: Client processes parametrized state machines. The actual state
-  machines are referred to as *behaviours*.
+* `client.erl`: Client processes parametrized by state machines. The actual
+  state machines are referred to as *behaviours*.
 * `simulation.erl`: Contains behaviours specific to the resource server context,
-  and a number of scenarios.
+  and a number of scenarios, i.e. zero-arity functions that run the system with
+  prespecified clients.
 
 ## Running the server
 
