@@ -1,7 +1,7 @@
 -module(server).
 -export([start/1, init/1]).
 -export([stop/0, stop/1, allocate/0, allocate/1, deallocate/0, deallocate/1,
-         inspect/0, inspect/1]).
+         inspect/0, inspect/1, deallocate_resource/1, deallocate_resource/2]).
 
 -define(TIMEOUT, 1000).
 -define(NAME, resources).
@@ -44,6 +44,24 @@ running(StorePid, Resources) ->
       Pid ! {reply, Tag, Reply},
       running(StorePid, NewResources);
 
+    {request, Tag, Pid, {deallocate, Res}} ->
+      NewResources = try deallocate(Resources, Pid, Res) of
+          {NewResources_, Reply} ->
+            utils:call(StorePid, {put, NewResources_}),
+            Pid ! {reply, Tag, Reply},
+            NewResources_
+      catch
+        throw:resource_not_allocated ->
+          Pid ! {reply, Tag, {error, resource_not_allocated}},
+          Resources;
+        throw:resource_not_owned ->
+          Pid ! {reply, Tag, {error, resource_not_owned}},
+          Resources
+      end,
+      %% Recursive call should be outside try-catch block to benefit from
+      %% tail-call optimization.
+      running(StorePid, NewResources);
+
     {request, Tag, Pid, inspect} ->
       Pid ! {reply, Tag, Resources},
       running(StorePid, Resources);
@@ -70,6 +88,10 @@ allocate(Timeout) -> call_server(allocate, Timeout).
 %% @doc Deallocate the resource held by the calling process.
 deallocate() -> deallocate(?TIMEOUT).
 deallocate(Timeout) -> call_server(deallocate, Timeout).
+
+deallocate_resource(Res) -> deallocate_resource(Res, ?TIMEOUT).
+deallocate_resource(Res, Timeout) ->
+  call_server({deallocate, Res}, Timeout).
 
 %% @doc Stop the server.
 stop() -> stop(?TIMEOUT).
@@ -99,6 +121,7 @@ allocate({Free, Taken}=Resources, Pid) ->
   end.
 
 %% @private
+%% @doc Deallocate resource by owner
 deallocate({Free, Taken}=Resources, Pid) ->
   case maps:take(Pid, Taken) of
     error ->
@@ -106,6 +129,16 @@ deallocate({Free, Taken}=Resources, Pid) ->
     {Res, NewTaken} ->
       unlink(Pid),
       {{[Res|Free], NewTaken}, {deallocated, Res}}
+  end.
 
+%% @private
+%% @doc Deallocate by owner and resource; throws when there is no match.
+deallocate({Free, Taken}, Pid, Res) ->
+  case lists:keytake(Res, 2, maps:to_list(Taken)) of
+    false -> throw(resource_not_allocated);
+    {value, {Pid, Res}, NewTaken} ->
+      {{[Res|Free], maps:from_list(NewTaken)}, {deallocated, Res}};
+    {value, {_, Res}, _} ->
+      throw(resource_not_owned)
   end.
 
