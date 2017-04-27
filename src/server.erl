@@ -74,7 +74,9 @@ running(StorePid, Resources) ->
     {'EXIT', Pid, _Reason} ->
       {NewResources, _Reply} = deallocate(Resources, Pid),
       utils:call(StorePid, {put, NewResources}),
-      running(StorePid, NewResources)
+      running(StorePid, NewResources);
+
+    _ -> throw(unknown_message)
 
   end.
 

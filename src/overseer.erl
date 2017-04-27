@@ -24,17 +24,17 @@ running(StorePid, ServerPid) ->
       Pid ! {reply, Tag, stopped};
 
     {'EXIT', ServerPid, Reason} ->
-      log:info(?NAME, "server exited with reason ~s~n", [Reason]),
+      log:info(?NAME, "server exited with reason ~p~n", [Reason]),
       running(StorePid, spawn_link(server, init, [StorePid]));
 
     {'EXIT', StorePid, Reason} ->
-      log:info(?NAME, "store exited with reason ~s~n", [Reason]),
+      log:info(?NAME, "store exited with reason ~p~n", [Reason]),
       NewStorePid = spawn_link(store, init, []),
       utils:call(ServerPid, {set_store, NewStorePid}),
       running(NewStorePid, ServerPid);
 
     {'EXIT', _, Reason} ->
-      log:err(?NAME, "received exit signal ~s~n", [Reason])
+      log:err(?NAME, "received exit signal ~p~n", [Reason])
 
   end.
 
