@@ -3,6 +3,7 @@
 -export([stop/0, stop/1, allocate/0, allocate/1, deallocate/0, deallocate/1,
          inspect/0, inspect/1, deallocate_resource/1, deallocate_resource/2,
          inject_resources/1, inject_resources/2]).
+-export([running/2]).
 
 -define(TIMEOUT, 1000).
 -define(NAME, resources).
@@ -37,13 +38,13 @@ running(StorePid, Resources) ->
       {NewResources, Reply} = allocate(Resources, Pid),
       utils:call(StorePid, {put, NewResources}),
       Pid ! {reply, Tag, Reply},
-      running(StorePid, NewResources);
+      server:running(StorePid, NewResources);
 
     {request, Tag, Pid, deallocate} ->
       {NewResources, Reply} = deallocate(Resources, Pid),
       utils:call(StorePid, {put, NewResources}),
       Pid ! {reply, Tag, Reply},
-      running(StorePid, NewResources);
+      server:running(StorePid, NewResources);
 
     {request, Tag, Pid, {deallocate, Res}} ->
       NewResources = try deallocate(Resources, Pid, Res) of
@@ -61,26 +62,27 @@ running(StorePid, Resources) ->
       end,
       %% Recursive call should be outside try-catch block to benefit from
       %% tail-call optimization.
-      running(StorePid, NewResources);
+      server:running(StorePid, NewResources);
 
     {request, Tag, Pid, inspect} ->
       Pid ! {reply, Tag, Resources},
-      running(StorePid, Resources);
+      server:running(StorePid, Resources);
 
     {request, Tag, Pid, {set_store, NewStorePid}} ->
       Pid ! {reply, Tag, ok},
       utils:call(NewStorePid, {put, Resources}),
-      running(NewStorePid, Resources);
+      server:running(NewStorePid, Resources);
 
     {request, Tag, Pid, {inject, Additional}} ->
       {NewResources, Reply} = inject(Resources, Additional),
+      utils:call(StorePid, {put, NewResources}),
       Pid ! {reply, Tag, Reply},
-      running(StorePid, NewResources);
+      server:running(StorePid, NewResources);
 
     {'EXIT', Pid, _Reason} ->
       {NewResources, _Reply} = deallocate(Resources, Pid),
       utils:call(StorePid, {put, NewResources}),
-      running(StorePid, NewResources);
+      server:running(StorePid, NewResources);
 
     _ -> throw(unknown_message)
 
