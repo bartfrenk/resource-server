@@ -27,3 +27,27 @@ The four remaining files hold:
 * `simulation.erl`: Contains behaviours specific to the resource server context,
   and a number of scenarios.
 
+## Running the server
+
+To allocate a single resource to the REPL process, start the REPL in the `src` directory:
+
+```
+erl overseer.erl
+```
+
+Then execute:
+
+```
+overseer:start()
+server:allocate()
+```
+
+To deallocate and stop the system:
+
+```
+server:deallocate()
+overseer:stop()
+server:stop()
+store:stop()
+```
+
