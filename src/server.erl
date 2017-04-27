@@ -1,7 +1,8 @@
 -module(server).
 -export([start/1, init/1]).
 -export([stop/0, stop/1, allocate/0, allocate/1, deallocate/0, deallocate/1,
-         inspect/0, inspect/1, deallocate_resource/1, deallocate_resource/2]).
+         inspect/0, inspect/1, deallocate_resource/1, deallocate_resource/2,
+         inject_resources/1, inject_resources/2]).
 
 -define(TIMEOUT, 1000).
 -define(NAME, resources).
@@ -71,6 +72,11 @@ running(StorePid, Resources) ->
       utils:call(NewStorePid, {put, Resources}),
       running(NewStorePid, Resources);
 
+    {request, Tag, Pid, {inject, Additional}} ->
+      {NewResources, Reply} = inject(Resources, Additional),
+      Pid ! {reply, Tag, Reply},
+      running(StorePid, NewResources);
+
     {'EXIT', Pid, _Reason} ->
       {NewResources, _Reply} = deallocate(Resources, Pid),
       utils:call(StorePid, {put, NewResources}),
@@ -94,6 +100,10 @@ deallocate(Timeout) -> call_server(deallocate, Timeout).
 deallocate_resource(Res) -> deallocate_resource(Res, ?TIMEOUT).
 deallocate_resource(Res, Timeout) ->
   call_server({deallocate, Res}, Timeout).
+
+inject_resources(Additional) -> inject_resources(Additional, ?TIMEOUT).
+inject_resources(Additional, Timeout) ->
+  call_server({inject, Additional}, Timeout).
 
 %% @doc Stop the server.
 stop() -> stop(?TIMEOUT).
@@ -144,3 +154,8 @@ deallocate({Free, Taken}, Pid, Res) ->
       throw(resource_not_owned)
   end.
 
+%% @private
+%% @doc Makes additional resources available for use
+%% TODO: check for duplicate resources
+inject({Free, Taken}, Additional) ->
+  {{Free ++ Additional, Taken}, injected}.
