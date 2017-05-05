@@ -1,9 +1,9 @@
 -module(server).
--export([start/1, init/1]).
+-export([start/2, init/2]).
 -export([stop/0, stop/1, allocate/0, allocate/1, deallocate/0, deallocate/1,
          inspect/0, inspect/1, deallocate_resource/1, deallocate_resource/2,
          inject_resources/1, inject_resources/2, upgrade/0, upgrade/1]).
--export([running/2]).
+-export([running/3]).
 
 -define(TIMEOUT, 1000).
 -define(NAME, resources).
@@ -12,21 +12,21 @@
 %% === Running a server ===
 
 %% @doc Spawns the resource server.
-start(StorePid) ->
-  spawn(fun() -> init(StorePid) end).
+start(I, StorePid) ->
+  spawn(fun() -> init(I, StorePid) end).
 
 %% @doc Starts the resource server.
-init(StorePid) ->
+init(I, StorePid) ->
   case utils:call(StorePid, get) of
     {ok, Resources} ->
       process_flag(trap_exit, true),
-      log:info(?NAME, "starting with allocations: ~p~n", [Resources]),
-      server:running(StorePid, Resources);
+      log:info(?NAME, "Server ~p: ~p~n", [I, Resources]),
+      server:running(I, StorePid, Resources);
     Msg -> log:warn(?NAME, "could not contact store: ~p~n", [Msg])
   end.
 
 %% @private
-running(StorePid, Resources) ->
+running(I, StorePid, Resources) ->
 
   receive
 
@@ -37,13 +37,13 @@ running(StorePid, Resources) ->
       {NewResources, Reply} = allocate(Resources, Pid),
       utils:call(StorePid, {put, NewResources}),
       Pid ! {reply, Tag, Reply},
-      running(StorePid, NewResources);
+      running(I, StorePid, NewResources);
 
     {request, Tag, Pid, deallocate} ->
       {NewResources, Reply} = deallocate(Resources, Pid),
       utils:call(StorePid, {put, NewResources}),
       Pid ! {reply, Tag, Reply},
-      running(StorePid, NewResources);
+      running(I, StorePid, NewResources);
 
     {request, Tag, Pid, {deallocate, Res}} ->
       NewResources = try deallocate(Resources, Pid, Res) of
@@ -61,34 +61,34 @@ running(StorePid, Resources) ->
       end,
       %% Recursive call should be outside try-catch block to benefit from
       %% tail-call optimization.
-      running(StorePid, NewResources);
+      running(I, StorePid, NewResources);
 
     {request, Tag, Pid, inspect} ->
       Pid ! {reply, Tag, Resources},
-      running(StorePid, Resources);
+      running(I, StorePid, Resources);
 
     {request, Tag, Pid, {set_store, NewStorePid}} ->
       Pid ! {reply, Tag, ok},
       utils:call(NewStorePid, {put, Resources}),
-      running(NewStorePid, Resources);
+      running(I, NewStorePid, Resources);
 
     {request, Tag, Pid, {inject, Additional}} ->
       {NewResources, Reply} = inject(Resources, Additional),
       utils:call(StorePid, {put, NewResources}),
       Pid ! {reply, Tag, Reply},
-      running(StorePid, NewResources);
+      running(I, StorePid, NewResources);
 
     {request, Tag, Pid, upgrade} ->
       compile:file(?MODULE),
       code:soft_purge(?MODULE),
       code:load_file(?MODULE),
       Pid ! {reply, Tag, upgraded},
-      server:running(StorePid, Resources);
+      server:running(I, StorePid, Resources);
 
     {'EXIT', Pid, _Reason} ->
       {NewResources, _Reply} = deallocate(Resources, Pid),
       utils:call(StorePid, {put, NewResources}),
-      running(StorePid, NewResources);
+      running(I, StorePid, NewResources);
 
     _ -> throw(unknown_message)
 

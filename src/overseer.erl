@@ -9,14 +9,14 @@
 start(ServerCount) ->
   spawn(fun() -> init(ServerCount) end).
 
-spawn_server(StorePid) ->
-  spawn_link(server, init, [StorePid]).
+spawn_server(I, StorePid) ->
+  spawn_link(server, init, [I, StorePid]).
 
 init(ServerCount) ->
   register(?NAME, self()), %% easier to refer to overseer
   process_flag(trap_exit, true),
   StorePid = spawn_link(store, init, []),
-  ServerPids = lists:map(fun(_) -> spawn_server(StorePid) end,
+  ServerPids = lists:map(fun(I) -> spawn_server(I, StorePid) end,
                          lists:seq(1, ServerCount)),
   running(StorePid, ServerPids).
 
