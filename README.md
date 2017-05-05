@@ -11,6 +11,8 @@ entire system consists of three processes:
 * A store that duplicates the state of the server and reseeds it when it
   restarts; this process could be responsible for persisting allocated resources
   if necessary. It is implemented in `store.erl`.
+* A router that routes allocation and deallocation requests to the appropriate
+  server in a round-robin fashion. It is implemented in `router.erl`.
 
 The basic premise is that clients should only depend on the server being up when
 they are allocating and deallocating resource, otherwise they shouldn't. I
@@ -30,7 +32,8 @@ The four remaining files hold:
 
 ## Running the server
 
-To allocate a single resource to the REPL process, start the REPL in the `src` directory:
+To allocate a single resource to the REPL process, compile everything in the
+`src` directory and start the REPL:
 
 ```
 erl overseer.erl
@@ -40,7 +43,7 @@ Then execute:
 
 ```
 overseer:start()
-server:allocate()
+router:allocate()
 ```
 
 To deallocate and stop the system:
@@ -48,7 +51,9 @@ To deallocate and stop the system:
 ```
 server:deallocate()
 overseer:stop()
-server:stop()
+router:stop()
 store:stop()
 ```
+
+**This leaves the server processes running without keeping track of their pids**.
 
