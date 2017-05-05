@@ -1,6 +1,6 @@
 -module(overseer).
 -export([start/1, stop/0 ,stop/1]).
--export([running/2]).
+-export([running/3]).
 -export([index_of/2, replace/3]).
 
 -define(NAME, overseer).
@@ -19,10 +19,12 @@ init(ServerCount) ->
   StorePid = spawn_link(store, init, [ServerCount]),
   ServerPids = lists:map(fun(I) -> spawn_server(I, StorePid) end,
                          lists:seq(1, ServerCount)),
-  running(StorePid, ServerPids).
+  RouterPid = spawn_link(router, init, [StorePid]),
+  running(StorePid, RouterPid, ServerPids).
 
-running(StorePid, ServerPids) ->
-  log:debug(?NAME, "store: ~p, servers: ~p~n", [StorePid, ServerPids]),
+running(StorePid, RouterPid, ServerPids) ->
+  log:debug(?NAME, "store: ~p, router: ~p, servers: ~p~n",
+            [StorePid, RouterPid, ServerPids]),
 
   receive
     {request, Tag, Pid, stop} ->
@@ -33,7 +35,12 @@ running(StorePid, ServerPids) ->
       NewStorePid = spawn_link(store, init, []),
       lists:map(fun(P) -> utils:call(P, {set_store, NewStorePid}) end,
                 ServerPids),
-      running(NewStorePid, ServerPids);
+      running(NewStorePid, RouterPid, ServerPids);
+
+    {'EXIT', RouterPid, Reason} ->
+      log:info(?NAME, "router exited with reason ~p~n", [Reason]),
+    %%   NewRouterPid = spawn_link(router, init, [StorePid]),
+      running(StorePid, RouterPid, ServerPids);
 
     {'EXIT', ProcessPid, Reason} ->
       case index_of(ProcessPid, ServerPids) of
@@ -43,7 +50,7 @@ running(StorePid, ServerPids) ->
           log:info(?NAME, "server ~p exited with reason ~p~n", [I, Reason]),
           P = spawn_link(server, init, [I, StorePid]),
           NewServerPids = replace(P, I, ServerPids),
-          running(StorePid, NewServerPids)
+          running(StorePid, RouterPid, NewServerPids)
         end
 
   end.

@@ -21,7 +21,7 @@ init(I, StorePid) ->
   case utils:call(StorePid, {get, I}) of
     {ok, Resources} ->
       process_flag(trap_exit, true),
-      log:info(?NAME, "Server ~p: ~p~n", [I, Resources]),
+      log:info(?NAME, "Server ~p: ~w~n", [I, Resources]),
       server:running(I, StorePid, Resources);
     Msg -> log:warn(?NAME, "could not contact store: ~p~n", [Msg])
   end.

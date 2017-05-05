@@ -21,7 +21,7 @@ init(ServerCount) ->
   running(resources(ServerCount)).
 
 running(Resources) ->
-  log:debug(?NAME, "resources: ~p~n", [Resources]),
+  log:debug(?NAME, "resources: ~w~n", [Resources]),
   receive
 
     {request, Tag, Pid, stop} ->
@@ -33,7 +33,12 @@ running(Resources) ->
 
     {request, Tag, Pid, {get, I}} ->
       Pid ! {reply, Tag, {ok, maps:get(I, Resources)}},
+      running(Resources);
+
+    {request, Tag, Pid, get} ->
+      Pid ! {reply, Tag, {ok, Resources}},
       running(Resources)
+
   end.
 
 stop() -> utils:call_registered(?NAME, stop).
