@@ -1,5 +1,5 @@
 -module(utils).
--export([call/2, call/3, call_registered/2, call_registered/3]).
+-export([call/2, call/3, forward/5, call_registered/2, call_registered/3]).
 -export([randoms/3]).
 
 -define(TIMEOUT, 1000).
@@ -27,3 +27,12 @@ call_registered(Name, Request, Timeout) ->
 randoms(N, Lo, Hi) ->
   Gen = fun(_) -> rand:uniform(Hi - Lo + 1) + (Lo - 1) end,
   lists:map(Gen, lists:seq(1, N)).
+
+
+forward(Client, Tag, Sender, Request, Timeout) ->
+  Client ! {request, Tag, Sender, Request},
+  receive
+    {reply, Tag, Reply} -> Reply
+  after Timeout -> timeout
+  end.
+

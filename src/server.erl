@@ -39,6 +39,12 @@ running(I, StorePid, Resources) ->
       Pid ! {reply, Tag, Reply},
       running(I, StorePid, NewResources);
 
+    {request, Tag, Return, {allocate_for, Pid}} ->
+      {NewResources, Reply} = allocate(Resources, Pid),
+      utils:call(StorePid, {put, I, NewResources}),
+      Return ! {reply, Tag, Reply},
+      running(I, StorePid, NewResources);
+
     {request, Tag, Pid, deallocate} ->
       {NewResources, Reply} = deallocate(Resources, Pid),
       utils:call(StorePid, {put, I, NewResources}),
