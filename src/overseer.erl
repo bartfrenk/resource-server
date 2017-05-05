@@ -19,7 +19,7 @@ init(ServerCount) ->
   StorePid = spawn_link(store, init, [ServerCount]),
   ServerPids = lists:map(fun(I) -> spawn_server(I, StorePid) end,
                          lists:seq(1, ServerCount)),
-  RouterPid = spawn_link(router, init, [StorePid]),
+  RouterPid = spawn_link(router, init, [StorePid, ServerPids]),
   running(StorePid, RouterPid, ServerPids).
 
 running(StorePid, RouterPid, ServerPids) ->
@@ -32,15 +32,16 @@ running(StorePid, RouterPid, ServerPids) ->
 
     {'EXIT', StorePid, Reason} ->
       log:info(?NAME, "store exited with reason ~p~n", [Reason]),
-      NewStorePid = spawn_link(store, init, []),
+      NewStorePid = spawn_link(store, init, [length(ServerPids)]),
       lists:map(fun(P) -> utils:call(P, {set_store, NewStorePid}) end,
                 ServerPids),
+      %% TODO: Push server state to the store
       running(NewStorePid, RouterPid, ServerPids);
 
     {'EXIT', RouterPid, Reason} ->
       log:info(?NAME, "router exited with reason ~p~n", [Reason]),
-    %%   NewRouterPid = spawn_link(router, init, [StorePid]),
-      running(StorePid, RouterPid, ServerPids);
+      NewRouterPid = spawn_link(router, init, [StorePid, ServerPids]),
+      running(StorePid, NewRouterPid, ServerPids);
 
     {'EXIT', ProcessPid, Reason} ->
       case index_of(ProcessPid, ServerPids) of

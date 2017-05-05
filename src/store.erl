@@ -1,6 +1,6 @@
 -module(store).
--export([start/1, init/1]).
--export([get/0, put/1, stop/0]).
+-export([start/1, init/1, running/1]).
+-export([get/0, put/1, stop/0, upgrade/0]).
 -export([resources/1]).
 -define(NAME, store).
 
@@ -21,7 +21,6 @@ init(ServerCount) ->
   running(resources(ServerCount)).
 
 running(Resources) ->
-  log:debug(?NAME, "resources: ~w~n", [Resources]),
   receive
 
     {request, Tag, Pid, stop} ->
@@ -37,7 +36,14 @@ running(Resources) ->
 
     {request, Tag, Pid, get} ->
       Pid ! {reply, Tag, {ok, Resources}},
-      running(Resources)
+      running(Resources);
+
+    {request, Tag, Pid, upgrade} ->
+      compile:file(?MODULE),
+      code:soft_purge(?MODULE),
+      code:load_file(?MODULE),
+      Pid ! {reply, Tag, upgraded},
+      store:running(Resources)
 
   end.
 
@@ -47,4 +53,5 @@ put(Resources) -> utils:call_registered(?NAME, {put, Resources}).
 
 get() -> utils:call_registered(?NAME, get).
 
+upgrade() -> utils:call_registered(?NAME, upgrade).
 

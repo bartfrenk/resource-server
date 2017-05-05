@@ -3,8 +3,7 @@
 -export([stop/0, stop/1, allocate/0, allocate/1, deallocate/0, deallocate/1,
          inspect/0, inspect/1, deallocate_resource/1, deallocate_resource/2,
          inject_resources/1, inject_resources/2, upgrade/0, upgrade/1]).
--export([running/3]).
-
+-export([running/3]). 
 -define(TIMEOUT, 1000).
 -define(NAME, resources).
 
