@@ -17,7 +17,8 @@ start(I, StorePid) ->
 
 %% @doc Starts the resource server.
 init(I, StorePid) ->
-  case utils:call(StorePid, get) of
+  log:info(?NAME, "Server ~p: contacting store ~p~n", [I, StorePid]),
+  case utils:call(StorePid, {get, I}) of
     {ok, Resources} ->
       process_flag(trap_exit, true),
       log:info(?NAME, "Server ~p: ~p~n", [I, Resources]),
@@ -35,20 +36,20 @@ running(I, StorePid, Resources) ->
 
     {request, Tag, Pid, allocate} ->
       {NewResources, Reply} = allocate(Resources, Pid),
-      utils:call(StorePid, {put, NewResources}),
+      utils:call(StorePid, {put, I, NewResources}),
       Pid ! {reply, Tag, Reply},
       running(I, StorePid, NewResources);
 
     {request, Tag, Pid, deallocate} ->
       {NewResources, Reply} = deallocate(Resources, Pid),
-      utils:call(StorePid, {put, NewResources}),
+      utils:call(StorePid, {put, I, NewResources}),
       Pid ! {reply, Tag, Reply},
       running(I, StorePid, NewResources);
 
     {request, Tag, Pid, {deallocate, Res}} ->
       NewResources = try deallocate(Resources, Pid, Res) of
           {NewResources_, Reply} ->
-            utils:call(StorePid, {put, NewResources_}),
+            utils:call(StorePid, {put, I, NewResources_}),
             Pid ! {reply, Tag, Reply},
             NewResources_
       catch
@@ -69,7 +70,7 @@ running(I, StorePid, Resources) ->
 
     {request, Tag, Pid, {set_store, NewStorePid}} ->
       Pid ! {reply, Tag, ok},
-      utils:call(NewStorePid, {put, Resources}),
+      utils:call(NewStorePid, {put, I, Resources}),
       running(I, NewStorePid, Resources);
 
     {request, Tag, Pid, {inject, Additional}} ->

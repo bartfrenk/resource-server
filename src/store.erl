@@ -1,33 +1,38 @@
 -module(store).
--export([start/0, start/1, init/0, init/1]).
+-export([start/1, init/1]).
 -export([get/0, put/1, stop/0]).
+-export([resources/1]).
 -define(NAME, store).
 
-resources() -> lists:seq(10, 20).
+resources(ServerCount) -> resources(10, ServerCount).
+resources(PoolSize, ServerCount) ->
+  L = lists:map(fun(I) ->
+                    {I, {lists:seq((I - 1) * PoolSize + 1, I * PoolSize), #{}}} end,
+            lists:seq(1, ServerCount)),
+  maps:from_list(L).
 
 %% @doc Spawns the resource store.
-start() -> start(resources()).
-start(Resources) ->
-  spawn(fun() -> init(Resources) end).
+start(ServerCount) ->
+  spawn(fun() -> init(ServerCount) end).
 
 %% @doc Starts the resource store.
-init() -> init(resources()).
-init(Resources) ->
+init(ServerCount) ->
   register(?NAME, self()), %% easier to refer to overseer
-  running({Resources, #{}}).
+  running(resources(ServerCount)).
 
 running(Resources) ->
+  log:debug(?NAME, "resources: ~p~n", [Resources]),
   receive
 
     {request, Tag, Pid, stop} ->
       Pid ! {reply, Tag, stopped};
 
-    {request, Tag, Pid, {put, NewResources}} ->
+    {request, Tag, Pid, {put, I, NewResources}} ->
       Pid ! {reply, Tag, ok},
-      running(NewResources);
+      running(maps:put(I, NewResources, Resources));
 
-    {request, Tag, Pid, get} ->
-      Pid ! {reply, Tag, {ok, Resources}},
+    {request, Tag, Pid, {get, I}} ->
+      Pid ! {reply, Tag, {ok, maps:get(I, Resources)}},
       running(Resources)
   end.
 
