@@ -19,7 +19,6 @@ start(StorePid) ->
 init(StorePid) ->
   case utils:call(StorePid, get) of
     {ok, Resources} ->
-      register(?NAME, self()),
       process_flag(trap_exit, true),
       log:info(?NAME, "starting with allocations: ~p~n", [Resources]),
       server:running(StorePid, Resources);
